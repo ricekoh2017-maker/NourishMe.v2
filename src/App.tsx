@@ -20,6 +20,7 @@ import { SeniorNutritionGuideModal } from './components/SeniorNutritionGuideModa
 import { AiSeniorNutritionistModal } from './components/AiSeniorNutritionistModal';
 import { SgGrocerSourcingView } from './components/SgGrocerSourcingView';
 import { LiveNutritionInspector } from './components/LiveNutritionInspector';
+import { TalkToUsView } from './components/TalkToUsView';
 import { 
   Sliders, 
   Sparkles, 
@@ -62,7 +63,7 @@ const DEFAULT_PROFILE: KitchenProfile = {
 
 export default function App() {
   const [profile, setProfile] = useState<KitchenProfile>(DEFAULT_PROFILE);
-  const [activeView, setActiveView] = useState<'recipes' | 'calibration' | 'grocer_sources' | 'live_data'>('recipes');
+  const [activeView, setActiveView] = useState<'recipes' | 'calibration' | 'grocer_sources' | 'live_data' | 'talk_to_us'>('recipes');
   const [seniorFontSize, setSeniorFontSize] = useState<boolean>(false);
   const [cartRecipes, setCartRecipes] = useState<Recipe[]>([SENIOR_RECIPES[0], SENIOR_RECIPES[1]]);
   
@@ -311,6 +312,13 @@ export default function App() {
           />
         )}
 
+        {/* VIEW 5: TALK TO US / DISQUS COMMUNITY FEEDBACK */}
+        {activeView === 'talk_to_us' && (
+          <TalkToUsView
+            seniorFontSize={seniorFontSize}
+          />
+        )}
+
       </main>
 
       {/* Recipe Detail Modal */}
@@ -375,6 +383,12 @@ export default function App() {
                 className="hover:text-stone-900 underline cursor-pointer"
               >
                 Calibrate Kitchen
+              </button>
+              <button 
+                onClick={() => setActiveView('talk_to_us')}
+                className="hover:text-stone-900 underline cursor-pointer"
+              >
+                Talk to Us (Disqus)
               </button>
             </div>
           </div>

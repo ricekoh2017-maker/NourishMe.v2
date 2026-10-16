@@ -9,8 +9,8 @@ interface HeaderProps {
   cartItemCount: number;
   seniorFontSize: boolean;
   onToggleFontSize: () => void;
-  activeView: 'calibration' | 'recipes' | 'grocer_sources' | 'live_data';
-  setActiveView: (view: 'calibration' | 'recipes' | 'grocer_sources' | 'live_data') => void;
+  activeView: 'calibration' | 'recipes' | 'grocer_sources' | 'live_data' | 'talk_to_us';
+  setActiveView: (view: 'calibration' | 'recipes' | 'grocer_sources' | 'live_data' | 'talk_to_us') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -82,6 +82,14 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               Live FDC Datamall
+            </button>
+            <button
+              onClick={() => setActiveView('talk_to_us')}
+              className={`hover:text-emerald-800 transition-colors whitespace-nowrap shrink-0 pb-1 cursor-pointer ${
+                activeView === 'talk_to_us' ? 'text-emerald-900 border-b-2 border-emerald-700 font-semibold' : ''
+              }`}
+            >
+              Talk to Us
             </button>
             <button
               onClick={onOpenNutritionGuide}
