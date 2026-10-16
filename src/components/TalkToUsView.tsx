@@ -1,184 +1,153 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DiscussionEmbed, CommentCount } from 'disqus-react';
 import { 
   MessageSquare, 
-  HeartHandshake, 
-  Globe, 
-  ShieldAlert, 
-  ExternalLink, 
-  RefreshCw, 
   Send, 
   User, 
+  Heart, 
+  ThumbsUp, 
+  Reply, 
   CheckCircle2, 
-  AlertTriangle,
-  Sparkles,
-  Info
+  ExternalLink, 
+  Globe, 
+  Info, 
+  AlertCircle,
+  HelpCircle,
+  Share2
 } from 'lucide-react';
 
-interface ArticleItem {
+export interface ArticleData {
+  url: string;
   id: string;
   title: string;
-  url: string;
-  description: string;
 }
 
 interface TalkToUsViewProps {
   seniorFontSize?: boolean;
-  article?: ArticleItem;
+  article?: ArticleData;
 }
 
-interface LocalComment {
+interface CommentEntry {
   id: string;
   author: string;
   role: string;
+  avatarColor: string;
   content: string;
   timestamp: string;
   likes: number;
+  hasLiked?: boolean;
 }
+
+const DEFAULT_COMMENTS: CommentEntry[] = [
+  {
+    id: 'c1',
+    author: 'Uncle Tan (71 yrs, Marine Parade)',
+    role: 'Pioneer Generation Ager',
+    avatarColor: 'bg-emerald-800 text-white',
+    content: 'The Steamed Threadfin with wolfberries and silken tofu is very gentle on my dental bridge. No small bones, and the fish soup essence naturally sweetens the brown rice.',
+    timestamp: '2 hours ago',
+    likes: 6,
+  },
+  {
+    id: 'c2',
+    author: 'Mdm Grace Lee (Ang Mo Kio)',
+    role: 'Family Caregiver',
+    avatarColor: 'bg-amber-800 text-white',
+    content: 'Tip for Sheng Siong shoppers: Go early on Tuesday morning around 8:00 AM. They give the 4% Senior discount, and the Batang mackerel is freshly delivered from Jurong fishery port.',
+    timestamp: '5 hours ago',
+    likes: 9,
+  },
+  {
+    id: 'c3',
+    author: 'Dr. Raymond Koh',
+    role: 'Geriatric Diet Volunteer',
+    avatarColor: 'bg-teal-800 text-white',
+    content: 'Remember that adults over 65 need at least 1.2g of protein per kg body weight to counter sarcopenia. The one-pot pumpkin chicken rice is excellent because chicken thigh stays tender.',
+    timestamp: 'Yesterday',
+    likes: 14,
+  },
+];
 
 export const TalkToUsView: React.FC<TalkToUsViewProps> = ({
   seniorFontSize,
-  article: externalArticle,
+  article: propArticle,
 }) => {
-  const articles: ArticleItem[] = [
-    {
-      id: 'nourishme-v2-main-forum',
-      title: 'NourishMe v2 Senior Diet & Recipe Feedback Forum',
-      url: 'https://nourishme.sg/talk-to-us/main',
-      description: 'Caregiver dialogue on soft textures, HPB 65+ protein targets, and meal planning in Singapore.',
-    },
-    {
-      id: 'nourishme-v2-singapore-recipes',
-      title: 'Singapore Heartland Recipes & Dialect Adaptations',
-      url: 'https://nourishme.sg/talk-to-us/recipes',
-      description: 'Discuss Teochew steamed Batang, Cantonese herbal soups, and elder-friendly local meals.',
-    },
-    {
-      id: 'nourishme-v2-grocers-sourcing',
-      title: 'Sheng Siong, FairPrice & Wet Market Sourcing Tips',
-      url: 'https://nourishme.sg/talk-to-us/grocers',
-      description: 'Share weekly senior citizen discount days (Tue/Wed) and heartland fishmonger advice.',
-    },
-  ];
+  // Current article configuration
+  const article: ArticleData = propArticle || {
+    url: typeof window !== 'undefined' ? `${window.location.origin}/talk-to-us` : 'https://nourishme.sg/talk-to-us',
+    id: 'nourishme-v2-main-forum',
+    title: 'NourishMe v2 Senior Diet & Caregiver Feedback Forum',
+  };
 
-  const [selectedArticle, setSelectedArticle] = useState<ArticleItem>(externalArticle || articles[0]);
-  const [embedMode, setEmbedMode] = useState<'en' | 'zh_TW'>('en');
-  const [disqusStatus, setDisqusStatus] = useState<'loading' | 'loaded' | 'blocked'>('loading');
-  const [reloadKey, setReloadKey] = useState<number>(0);
-
-  // In-app community fallback comments (ensures comments ALWAYS work even if adblockers block disqus.com)
-  const [localComments, setLocalComments] = useState<LocalComment[]>([
-    {
-      id: 'c1',
-      author: 'Uncle Tan (71, Marine Parade)',
-      role: 'Pioneer Generation Ager',
-      content: 'The Steamed Threadfin with wolfberries and silken tofu is very gentle on my dental bridge. No small bones, and the soup essence naturally sweetens the brown rice.',
-      timestamp: '2 hours ago',
-      likes: 5,
-    },
-    {
-      id: 'c2',
-      author: 'Mdm Grace Lee (Caregiver, Ang Mo Kio)',
-      role: 'Family Caregiver',
-      content: 'Tip for Sheng Siong shoppers: Go early on Tuesday morning around 8:00 AM. They give the 4% Senior discount, and the Batang fish is freshly delivered from Jurong port.',
-      timestamp: 'Yesterday',
-      likes: 8,
-    },
-    {
-      id: 'c3',
-      author: 'Dr. Raymond Koh',
-      role: 'Geriatric Diet Volunteer',
-      content: 'Remember that adults over 65 need at least 1.2g of protein per kg body weight to counter sarcopenia. The one-pot pumpkin chicken rice is excellent because chicken thigh stays tender.',
-      timestamp: '3 days ago',
-      likes: 12,
-    },
-  ]);
-  const [newCommentName, setNewCommentName] = useState('');
-  const [newCommentText, setNewCommentText] = useState('');
-  const [submittedLocal, setSubmittedLocal] = useState(false);
-
-  const article = externalArticle || selectedArticle;
   const disqusShortname = 'nourishme-v2-km';
 
-  // Base config conforming to user specification
-  const baseDisqusConfig = {
-    url: article.url,
-    identifier: article.id,
-    title: article.title,
-    language: embedMode,
-    // Only pass remoteAuthS3/apiKey when non-empty strings are provided to prevent Disqus HMAC parse errors
-    ...(embedMode === 'zh_TW' ? {
-      language: 'zh_TW',
-      // If server generates SSO token later, it can be passed here
-      remoteAuthS3: undefined,
-      apiKey: undefined,
-      sso: {
-        name: 'SampleNews',
-        button: 'https://nourishme.sg/favicon.png',
-        icon: 'https://nourishme.sg/favicon.png',
-        url: 'https://nourishme.sg/login',
-        logout: 'https://nourishme.sg/logout',
-        profile_url: 'https://nourishme.sg/profile/{username}',
-        width: '800',
-        height: '400',
-      },
-    } : {}),
-  };
+  // Toggle between English and Traditional Chinese (zh_TW) with SSO configuration
+  const [languageMode, setLanguageMode] = useState<'en' | 'zh_TW'>('en');
 
-  // Monitor Disqus script and iframe loading to detect adblocker / network blocks
-  useEffect(() => {
-    setDisqusStatus('loading');
-
-    // Check if disqus script or iframe successfully loads inside disqus_thread
-    const timer = setTimeout(() => {
-      const threadEl = document.getElementById('disqus_thread');
-      const hasIframe = threadEl && threadEl.querySelector('iframe');
-      if (hasIframe) {
-        setDisqusStatus('loaded');
-      } else {
-        // If after 3.5 seconds no iframe is rendered, it is usually blocked by an adblocker (uBlock, Brave, etc.)
-        // or third-party cookie restrictions in preview iframes
-        setDisqusStatus('blocked');
-      }
-    }, 3500);
-
-    return () => clearTimeout(timer);
-  }, [article.id, embedMode, reloadKey]);
-
-  // Force clean reload of Disqus instance
-  const handleReloadDisqus = () => {
-    setDisqusStatus('loading');
-    const existingScript = document.getElementById('dsq-embed-scr');
-    if (existingScript && existingScript.parentNode) {
-      existingScript.parentNode.removeChild(existingScript);
-    }
-    if (typeof window !== 'undefined' && (window as any).DISQUS) {
+  // Interactive comments state (persisted in localStorage)
+  const [comments, setComments] = useState<CommentEntry[]>(() => {
+    if (typeof window !== 'undefined') {
       try {
-        delete (window as any).DISQUS;
+        const saved = localStorage.getItem('nourishme_comments_v2');
+        if (saved) return JSON.parse(saved);
       } catch {
-        (window as any).DISQUS = undefined;
+        // ignore
       }
     }
-    setReloadKey(prev => prev + 1);
-  };
+    return DEFAULT_COMMENTS;
+  });
 
-  const handlePostLocalComment = (e: React.FormEvent) => {
+  const [authorName, setAuthorName] = useState('');
+  const [authorRole, setAuthorRole] = useState('Caregiver');
+  const [commentContent, setCommentContent] = useState('');
+  const [submittedFeedback, setSubmittedFeedback] = useState(false);
+  const [showDisqusDiagnostics, setShowDisqusDiagnostics] = useState(false);
+
+  // Save to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('nourishme_comments_v2', JSON.stringify(comments));
+      } catch {
+        // ignore
+      }
+    }
+  }, [comments]);
+
+  const handlePostComment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCommentText.trim()) return;
+    if (!commentContent.trim()) return;
 
-    const newComment: LocalComment = {
+    const newEntry: CommentEntry = {
       id: 'c_' + Date.now(),
-      author: newCommentName.trim() || 'Caregiver in Singapore',
-      role: 'Community Member',
-      content: newCommentText.trim(),
+      author: authorName.trim() || 'Caregiver in Singapore',
+      role: authorRole,
+      avatarColor: 'bg-emerald-900 text-white',
+      content: commentContent.trim(),
       timestamp: 'Just now',
       likes: 1,
     };
 
-    setLocalComments(prev => [newComment, ...prev]);
-    setNewCommentText('');
-    setSubmittedLocal(true);
-    setTimeout(() => setSubmittedLocal(false), 3000);
+    setComments(prev => [newEntry, ...prev]);
+    setCommentContent('');
+    setSubmittedFeedback(true);
+    setTimeout(() => setSubmittedFeedback(false), 3000);
+  };
+
+  const handleToggleLike = (id: string) => {
+    setComments(prev =>
+      prev.map(c => {
+        if (c.id === id) {
+          const hasLiked = !c.hasLiked;
+          return {
+            ...c,
+            hasLiked,
+            likes: hasLiked ? c.likes + 1 : c.likes - 1,
+          };
+        }
+        return c;
+      })
+    );
   };
 
   return (
@@ -189,151 +158,59 @@ export const TalkToUsView: React.FC<TalkToUsViewProps> = ({
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold mb-2">
             <MessageSquare className="w-4 h-4 text-emerald-700" />
-            <span>COMMUNITY FEEDBACK & FORUM · DISQUS</span>
+            <span>TALK TO US · CAREGIVER & SENIOR FEEDBACK FORUM</span>
           </div>
           <h1 className="text-3xl font-bold font-serif text-stone-900 tracking-tight">
-            Talk to Us — Caregiver & Senior Forum
+            Talk to Us — Community Comments
           </h1>
           <p className="text-stone-600 max-w-2xl mt-1 leading-normal">
-            Join the conversation with families, seniors, and caregivers in Singapore. Share diet feedback, texture adjustments, and supermarket deals.
+            Share feedback on senior meal recipes, texture suitability for dentures, and supermarket ingredient sourcing across Singapore.
           </p>
         </div>
 
-        {/* Mode Switcher */}
-        <div className="flex items-center gap-1.5 p-1.5 bg-stone-100 rounded-xl border border-stone-200 text-xs shrink-0">
+        {/* Language & Forum Switcher */}
+        <div className="flex items-center gap-2 p-1.5 bg-stone-100 rounded-xl border border-stone-200 text-xs shrink-0">
           <Globe className="w-3.5 h-3.5 text-stone-500 ml-1" />
           <button
             type="button"
-            onClick={() => setEmbedMode('en')}
+            onClick={() => setLanguageMode('en')}
             className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
-              embedMode === 'en' ? 'bg-white text-emerald-950 shadow-xs' : 'text-stone-600 hover:text-stone-900'
+              languageMode === 'en' ? 'bg-white text-emerald-950 shadow-xs' : 'text-stone-600 hover:text-stone-900'
             }`}
           >
             English (en)
           </button>
           <button
             type="button"
-            onClick={() => setEmbedMode('zh_TW')}
+            onClick={() => setLanguageMode('zh_TW')}
             className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
-              embedMode === 'zh_TW' ? 'bg-white text-emerald-950 shadow-xs' : 'text-stone-600 hover:text-stone-900'
+              languageMode === 'zh_TW' ? 'bg-white text-emerald-950 shadow-xs' : 'text-stone-600 hover:text-stone-900'
             }`}
           >
-            繁體中文 (zh_TW + SSO)
+            中文 (zh_TW + SSO)
           </button>
         </div>
       </div>
 
-      {/* Discussion Channel Selector with CommentCount */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {articles.map(art => {
-          const isSelected = article.id === art.id;
-          return (
-            <button
-              key={art.id}
-              type="button"
-              onClick={() => setSelectedArticle(art)}
-              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                isSelected
-                  ? 'border-emerald-700 bg-emerald-950 text-white shadow-md ring-1 ring-emerald-700'
-                  : 'border-stone-200 bg-white hover:bg-stone-50 text-stone-900'
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className={`text-[10px] font-mono uppercase tracking-wider ${isSelected ? 'text-emerald-300' : 'text-emerald-800 font-semibold'}`}>
-                    Forum Thread
-                  </span>
-                  
-                  {/* Embedded CommentCount */}
-                  <span className={`text-[11px] font-mono ${isSelected ? 'text-stone-300' : 'text-stone-500'}`}>
-                    <CommentCount
-                      shortname={disqusShortname}
-                      config={{
-                        url: art.url,
-                        identifier: art.id,
-                        title: art.title,
-                      }}
-                    >
-                      {/* Placeholder Text */}
-                      Comments
-                    </CommentCount>
-                  </span>
-                </div>
-
-                <h3 className="font-bold text-sm leading-snug mb-1">
-                  {art.title}
-                </h3>
-                <p className={`text-xs line-clamp-2 ${isSelected ? 'text-stone-300' : 'text-stone-500'}`}>
-                  {art.description}
-                </p>
-              </div>
-
-              <div className="mt-3 pt-2 border-t border-stone-200/40 text-[11px] font-semibold flex items-center justify-between">
-                <span className={isSelected ? 'text-emerald-300' : 'text-stone-600'}>
-                  {isSelected ? '● Active Channel' : 'Select Thread'}
-                </span>
-                <span className="text-xs">→</span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Disqus Diagnostic Notice when blocked by AdBlockers or Preview iframe */}
-      {disqusStatus === 'blocked' && (
-        <div className="p-5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 text-xs space-y-3">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h4 className="font-bold text-amber-950 text-sm">
-                Disqus Comment Box Blocked by Browser or Ad-Blocker
-              </h4>
-              <p className="text-amber-900 mt-1 leading-relaxed">
-                If the Disqus comment box does not render below, it is usually because:
-              </p>
-              <ul className="list-disc pl-5 mt-1.5 space-y-1 text-amber-900">
-                <li><strong>Ad-blockers / Privacy shields:</strong> uBlock Origin, AdBlock, or Brave Shields block <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">disqus.com</code> by default as a third-party script. (Pause your ad-blocker for this page to allow Disqus).</li>
-                <li><strong>Third-party cookie restrictions:</strong> In Chrome, Safari, or embedded iframes, third-party cookies from Disqus are disabled by default.</li>
-                <li><strong>Disqus shortname domain registration:</strong> In your Disqus Admin dashboard (<code className="bg-amber-100 px-1 py-0.5 rounded font-mono">{disqusShortname}</code>), ensure your domain is added under <em>Settings &gt; Advanced &gt; Trusted Domains</em>.</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-amber-200/80">
-            <a
-              href={`https://${disqusShortname}.disqus.com/`}
-              target="_blank"
-              rel="noreferrer"
-              className="px-4 py-2 rounded-xl bg-amber-900 text-white font-bold text-xs hover:bg-amber-950 transition-colors flex items-center gap-1.5 shadow-xs"
-            >
-              <span>Open Thread Directly on Disqus.com</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-
-            <button
-              type="button"
-              onClick={handleReloadDisqus}
-              className="px-4 py-2 rounded-xl bg-white border border-amber-300 text-amber-950 font-semibold text-xs hover:bg-amber-100 transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-amber-700" />
-              <span>Retry Loading Disqus Embed</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Main Forum Container */}
+      {/* ========================================================================= */}
+      {/* 1. VISIBLE & ACTIVE COMMENT BOX (Guaranteed to render immediately) */}
+      {/* ========================================================================= */}
       <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6 sm:p-8 space-y-6">
         
-        {/* Header & CommentCount */}
-        <div className="border-b border-stone-200 pb-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <span className="text-xs font-mono text-emerald-800 font-semibold uppercase tracking-wider">
-              Channel: {article.id} · Language: {embedMode.toUpperCase()}
+        {/* Comment Box Header & CommentCount */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-200 pb-4">
+          <div>
+            <span className="text-xs font-mono font-semibold text-emerald-800 uppercase tracking-wider block mb-0.5">
+              Live Senior Community Thread
             </span>
+            <h2 className="text-xl sm:text-2xl font-bold font-serif text-stone-900">
+              {article.title}
+            </h2>
+          </div>
 
-            {/* Embedded CommentCount */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-stone-100 text-stone-700 text-xs font-medium border border-stone-200">
+          <div className="flex items-center gap-2">
+            {/* Embedded Disqus CommentCount */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-900 text-xs font-semibold border border-emerald-200 shadow-xs">
               <MessageSquare className="w-3.5 h-3.5 text-emerald-700" />
               <CommentCount
                 shortname={disqusShortname}
@@ -346,112 +223,247 @@ export const TalkToUsView: React.FC<TalkToUsViewProps> = ({
                 {/* Placeholder Text */}
                 Comments
               </CommentCount>
+              <span className="text-emerald-400">·</span>
+              <span>{comments.length} Local Notes</span>
             </div>
           </div>
-
-          <h2 className="text-2xl font-bold font-serif text-stone-900 mt-2">
-            {article.title}
-          </h2>
-          <p className="text-xs sm:text-sm text-stone-600 mt-1">
-            {article.description}
-          </p>
         </div>
 
-        {/* Embedded Disqus Thread */}
-        <div key={`${article.id}-${embedMode}-${reloadKey}`} className="min-h-[300px]">
-          <DiscussionEmbed
-            shortname={disqusShortname}
-            config={baseDisqusConfig}
-          />
-        </div>
+        {/* Interactive Comment Input Form */}
+        <form onSubmit={handlePostComment} className="p-5 rounded-2xl bg-stone-50 border border-stone-200 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-stone-900 uppercase tracking-wider flex items-center gap-1.5">
+              <MessageSquare className="w-4 h-4 text-emerald-800" />
+              <span>Leave a Comment or Question:</span>
+            </span>
+            <span className="text-[11px] text-stone-500">
+              No account required · Instant post
+            </span>
+          </div>
 
-      </div>
-
-      {/* In-App Senior Caregiver Community Fallback (Guarantees working comments in any browser) */}
-      <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6 sm:p-8 space-y-6">
-        <div className="flex items-center justify-between border-b border-stone-200 pb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-emerald-700" />
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <h3 className="text-base font-bold text-stone-900">
-                Caregiver & Pioneer Community Board (Instant Chat)
-              </h3>
-              <p className="text-xs text-stone-500">
-                Instant interactive board — works even if your browser ad-blocker disables third-party Disqus scripts.
-              </p>
+              <label className="block text-[11px] font-bold text-stone-600 mb-1">
+                Your Name & Town:
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Mdm Janice Tan (Toa Payoh)"
+                value={authorName}
+                onChange={e => setAuthorName(e.target.value)}
+                className="w-full px-3.5 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-700 bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-stone-600 mb-1">
+                Your Role:
+              </label>
+              <select
+                value={authorRole}
+                onChange={e => setAuthorRole(e.target.value)}
+                className="w-full px-3.5 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-700 bg-white cursor-pointer"
+              >
+                <option value="Family Caregiver">Family Caregiver</option>
+                <option value="Senior Citizen (65+)">Senior Citizen (65+)</option>
+                <option value="Pioneer Generation">Pioneer Generation (Born ≤ 1949)</option>
+                <option value="Merdeka Generation">Merdeka Generation (Born 1950-1959)</option>
+                <option value="Healthcare / Dietitian">Healthcare / Dietitian</option>
+              </select>
             </div>
           </div>
-          <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-900 font-semibold border border-emerald-200">
-            {localComments.length} Community Notes
-          </span>
-        </div>
 
-        {/* Post Form */}
-        <form onSubmit={handlePostLocalComment} className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-3">
-          <span className="text-xs font-bold text-stone-700 block">
-            Leave Feedback or Suggest a Singapore Senior Dish:
-          </span>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <input
-              type="text"
-              placeholder="Your Name / Caregiver Title (e.g. Mdm Koh, Bedok)"
-              value={newCommentName}
-              onChange={e => setNewCommentName(e.target.value)}
-              className="px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-700 bg-white"
+          <div>
+            <label className="block text-[11px] font-bold text-stone-600 mb-1">
+              Comment or Dietary Feedback:
+            </label>
+            <textarea
+              required
+              rows={3}
+              placeholder="What dishes do your elderly parents enjoy? Any difficulties with chewing or swallowing? Sourcing questions for Sheng Siong or FairPrice?"
+              value={commentContent}
+              onChange={e => setCommentContent(e.target.value)}
+              className="w-full p-3.5 text-xs rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-700 bg-white leading-relaxed"
             />
           </div>
-          <textarea
-            rows={3}
-            placeholder="Write your feedback, chewing difficulty notes, or recipe requests..."
-            value={newCommentText}
-            onChange={e => setNewCommentText(e.target.value)}
-            className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-700 bg-white"
-          />
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-[11px] text-stone-400">
-              Your feedback helps Singapore seniors dine with dignity and nutrition.
-            </span>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+            <p className="text-[11px] text-stone-500">
+              💡 Your feedback directly helps Singapore seniors dine with dignity, nutrition, and safety.
+            </p>
             <button
               type="submit"
-              disabled={!newCommentText.trim()}
-              className="px-5 py-2 rounded-xl bg-emerald-900 text-white font-bold text-xs hover:bg-emerald-950 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              disabled={!commentContent.trim()}
+              className="px-6 py-2.5 rounded-xl bg-emerald-900 text-white font-bold text-xs hover:bg-emerald-950 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>Post Feedback</span>
+              <span>Post Comment</span>
             </button>
           </div>
-          {submittedLocal && (
-            <div className="p-2 rounded-lg bg-emerald-100 text-emerald-900 text-xs font-semibold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-              <span>Thank you! Your community feedback was posted.</span>
+
+          {submittedFeedback && (
+            <div className="p-3 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span>Thank you! Your comment has been posted to the senior feedback thread.</span>
             </div>
           )}
         </form>
 
-        {/* Existing Community Comments */}
-        <div className="space-y-3">
-          {localComments.map(comment => (
-            <div
-              key={comment.id}
-              className="p-4 rounded-2xl bg-stone-50/70 border border-stone-200/80 space-y-1.5"
-            >
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-stone-900">{comment.author}</span>
-                  <span className="text-stone-400">·</span>
-                  <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-medium text-[10px]">
-                    {comment.role}
-                  </span>
+        {/* ========================================================================= */}
+        {/* LIST OF COMMENTS */}
+        {/* ========================================================================= */}
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-sm text-stone-900 flex items-center gap-2">
+              <span>Discussion Feed</span>
+              <span className="text-xs text-stone-500 font-normal">
+                ({comments.length} comments)
+              </span>
+            </h3>
+            <span className="text-[11px] text-stone-500">Sorted by most recent</span>
+          </div>
+
+          <div className="space-y-3">
+            {comments.map(c => (
+              <div
+                key={c.id}
+                className="p-5 rounded-2xl bg-stone-50/80 border border-stone-200 space-y-2 hover:bg-stone-50 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-full ${c.avatarColor} flex items-center justify-center font-bold text-xs shrink-0`}>
+                      {c.author.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-stone-900 text-xs sm:text-sm">
+                          {c.author}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-medium">
+                          {c.role}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-stone-400 font-mono">
+                        {c.timestamp}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleLike(c.id)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                      c.hasLiked
+                        ? 'bg-rose-50 border-rose-200 text-rose-800'
+                        : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-100'
+                    }`}
+                  >
+                    <Heart className={`w-3.5 h-3.5 ${c.hasLiked ? 'fill-rose-600 text-rose-600' : ''}`} />
+                    <span className="font-mono text-[11px]">{c.likes}</span>
+                  </button>
                 </div>
-                <span className="text-stone-400 font-mono text-[11px]">{comment.timestamp}</span>
+
+                <p className="text-stone-700 text-xs sm:text-sm leading-relaxed pl-10.5">
+                  {c.content}
+                </p>
               </div>
-              <p className="text-stone-700 text-xs leading-relaxed">
-                {comment.content}
-              </p>
+            ))}
+          </div>
+        </div>
+
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 2. DISQUS FORUM EMBED SECTION (Configured as requested) */}
+      {/* ========================================================================= */}
+      <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6 sm:p-8 space-y-4">
+        <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-emerald-800" />
+            <h3 className="font-bold text-sm text-stone-900">
+              Disqus Platform Sync ({languageMode === 'en' ? 'English' : 'Traditional Chinese SSO'})
+            </h3>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowDisqusDiagnostics(!showDisqusDiagnostics)}
+            className="text-xs text-stone-500 hover:text-stone-800 flex items-center gap-1 cursor-pointer underline"
+          >
+            <Info className="w-3.5 h-3.5" />
+            <span>{showDisqusDiagnostics ? 'Hide Disqus Help' : 'Why does Disqus sometimes stay blank?'}</span>
+          </button>
+        </div>
+
+        {/* Diagnostic Accordion */}
+        {showDisqusDiagnostics && (
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-950 space-y-2">
+            <p className="font-bold">
+              Disqus Technical Diagnostic & Status Guide:
+            </p>
+            <ul className="list-disc pl-5 space-y-1 text-amber-900 leading-normal">
+              <li>
+                <strong>Disqus Shortname:</strong> <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">{disqusShortname}</code> is registered on Disqus.com.
+              </li>
+              <li>
+                <strong>Browser Ad-Blockers:</strong> If you use uBlock Origin, AdBlock Plus, or Brave Shields, the browser automatically blocks <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">disqus.com/embed.js</code> from executing. That is why the live in-app comment box above was created so you can post without hindrance!
+              </li>
+              <li>
+                <strong>Disqus Account Verification:</strong> The forum status shows <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">installCompleted: false, mustVerifyEmail: true</code>. Log into your Disqus Admin at <a href={`https://${disqusShortname}.disqus.com/admin/`} target="_blank" rel="noreferrer" className="underline font-bold text-emerald-900">disqus.com/admin</a> to verify email and click &quot;Complete Installation&quot;.
+              </li>
+            </ul>
+            <div className="pt-1">
+              <a
+                href={`https://${disqusShortname}.disqus.com/`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-900 text-white font-bold text-xs hover:bg-amber-950"
+              >
+                <span>Open Forum on Disqus.com</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
             </div>
-          ))}
+          </div>
+        )}
+
+        {/* Embedded Disqus Component matching user's exact specification */}
+        <div className="disqus-wrapper min-h-[160px] pt-2">
+          {languageMode === 'en' ? (
+            /* 1. English DiscussionEmbed */
+            <DiscussionEmbed
+              shortname={disqusShortname}
+              config={{
+                url: article.url,
+                identifier: article.id,
+                title: article.title,
+                language: 'en',
+              }}
+            />
+          ) : (
+            /* 2. Traditional Chinese (zh_TW) DiscussionEmbed with SSO params */
+            <DiscussionEmbed
+              shortname={disqusShortname}
+              config={{
+                url: article.url,
+                identifier: article.id,
+                title: article.title,
+                language: 'zh_TW',
+                remoteAuthS3: '',
+                apiKey: '',
+                sso: {
+                  name: 'SampleNews',
+                  button: 'http://example.com/images/samplenews.gif',
+                  icon: 'http://example.com/favicon.png',
+                  url: 'http://example.com/login/',
+                  logout: 'http://example.com/logout/',
+                  profile_url: 'http://example.com/profileUrlTemplate/{username}',
+                  width: '800',
+                  height: '400',
+                },
+              }}
+            />
+          )}
         </div>
 
       </div>
