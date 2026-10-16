@@ -1,0 +1,6 @@
+{
+  "name": "SilverApron SG - Senior Diet & Recipe Engine",
+  "description": "Personalised Singapore senior dietary recommendations (65+), nutrient-dense easy-prep recipes, and local SG grocer ingredient sourcing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
